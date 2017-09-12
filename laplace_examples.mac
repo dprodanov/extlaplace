@@ -1,0 +1,41 @@
+
+load(extlaplace);
+
+a1:ilt(arctan(k/s),s,t);
+
+ilaplace(q*a1);
+
+inop(a1)='ilt, pred;
+
+ilaplace(a1);
+
+b1:ilt(log((s-a)/log(s-b) ),s,t);
+
+ilaplace(b1);
+
+lapratiop(1/s^p);
+
+ilt(1/s^p,s,t);
+
+c1:ilt(1/s^p,s,t);
+
+laptable[nil]: lambda([u],   false);
+
+laptable[nil](a);
+
+ilaplace(c1);
+
+lapexpp(1/sqrt(s)*exp(-k*s));
+
+d1:ilt(1/sqrt(s)/s*exp(-k/s),s,t);
+
+ilaplace(d1);
+
+e1:ilt(1/sqrt(s)*exp(k/s),s,t);
+
+ilaplace(e1);
+
+%,k=1;
+
+;
+

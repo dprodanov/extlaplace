@@ -1,0 +1,164 @@
+
+load("operpart.mac");
+
+diffp(expr):= inop(expr)=nounify('derivative);
+
+lapsymb:nounify('laplace);
+
+laplacexp (expr):=not freeof(lapsymb, expr);
+ilaplacexp (expr):=not freeof('ilt, expr);
+
+noundisp:true;
+lispdisp:true;
+
+/*
+make sure that the variables are indefinite
+*/
+kill(%tvar, %lvar);
+
+partbyvar(expr, var):= block([u],
+	oppart(expr,  lambda([u], freeof(var, u)))
+);
+
+/*
+ Laplace transform tweaks
+*/
+laparrange(expr):=block([xx, tt, ss, l, r, ret, opsubst : true ],
+	if inop(expr)="+" then 
+		ret:map(laparrange, expr)
+	else (		
+		if mapatom(expr) then return(expr),
+		ret:subst(lapsymb=lambda([xx, tt, ss], 
+			([l, r]:oppart(xx, lambda([u], freeof(tt, u))),
+				l:subst(nil=1, l),
+				r:subst(nil=1, r)
+			),
+			'laplace(r, tt, ss)*l
+			),
+		expr
+		)
+	),
+	ret
+);
+
+
+
+/* Laplace transform manupulations */
+lapsymsubst(expr, dvar):=block([xx, tt, ss, ee], 
+	subst( lapsymb=lambda([xx, tt, ss], 
+			ee:buildq([dvar], depends(dvar, ss)), 
+			ev(ee, nouns),
+			dvar), 
+	expr) 
+);	
+
+
+
+/* [Pattern matching*/
+matchdeclare( laptransf, laplacexp, [ %f, %g ], true, [ %s, %t, %p ], atom );
+
+
+defmatch (lapargs, 'ilt(%f, %s, %t));
+defmatch (lapratio, %f*%s^(-1));
+defmatch (lapratiop, %f*%s^(-%p));
+defmatch (lapexpp, %f*%e^(%g));
+
+ilapargs(expr):= block([ %f, %s, %t], 
+	if lapargs(expr)#false then [%f, %s, %t] else false
+);
+
+/*  main  ILT functionality*/
+ilaplace(expr):=block([l, r:1, fun, ret, %tvar, %lvar],
+	if ilaplacexp(expr) then (
+		if inop(expr)=nounify('ilt) then (
+			ret:ilapargs(expr),
+			[fun, %lvar, %tvar]:ilapargs(expr)
+		)else (
+			[l, r]:oppart(expr, ilaplacexp),
+			display(l, r),
+			[fun, %lvar, %tvar]:ilapargs(l)
+		),
+		display(%lvar, %tvar),	
+		ret: r* intablelapfun(fun)
+	)
+	else ret:expr,
+	ret
+);
+
+
+/*
+ main table  lookup functionality
+*/
+
+intablelapfun(expr):= block([ops: op(expr)],
+	if symbolp(ops) then 
+		laptable[ops](args(expr))
+	elseif ops="/" then (
+		disp(expr),
+		if freeof(%e, expr) then 
+			laptable["/"](expr)
+		else
+			laptable["ef1"](expr)
+		)
+	else	false
+);
+
+/*
+ lookup table closure
+ and  interface pattern
+*/
+laptable[nil]: lambda([u],   false);
+
+/*
+Lookup tables
+*/
+laptable[arctan]: lambda([u],  
+	block([ l, r],
+		u:first(u),
+		if hipow(u, %lvar)#-1 then false else (
+		[l, r]: partbyvar(u, %lvar),
+		1/%tvar *sin (l*%tvar)
+		)
+	)
+);
+
+laptable[log]: lambda([u],  
+	block([%a, %b],
+		u:first(u),
+		if op(u)#"/" then false else (
+		%a:num(u)-s,
+		%b:denom(u)-s,
+		1/%tvar *(exp (%b*%tvar) - exp (%a*%tvar))
+		)
+	)
+);
+
+/* fractional power*/
+laptable["/"]: lambda([u],  
+	block([%f, %p, %s],
+		if op(u)#"/" then false else (
+		lapratiop(u),
+		%tvar^(%p-1)/gamma(%p)
+		)
+	)
+);
+
+/*   exp -> bessel_j  bessel_i*/
+laptable["ef1"]: lambda([u],  
+	block([%f, %p, %s, %g, besselexpand:true ],
+		if op(u)#"/" then false else (
+		(lapexpp(u)),
+		%p:-hipow(%f, %lvar),
+		(lapratio(%g)),
+		if not freeof(-1, %f) then
+			%g:(-%tvar/%f)^((%p-1)/2) * bessel_j(%p-1, 2*sqrt(-%f * %tvar) )
+		else
+			%g:(%tvar/%f)^((%p-1)/2) * bessel_i(%p-1, 2*sqrt(%f * %tvar) ),
+		rootscontract(radcan(%g))
+		)
+	)
+);
+ 
+ 
+
+
