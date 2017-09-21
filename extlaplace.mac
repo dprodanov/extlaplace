@@ -8,7 +8,23 @@ conventions:
 
 	%variables: matching variables, global scope, suffer from side effects
 	funcionp: predicate
-*/
+	
+	version 1.0 Date 17 Sept 2017
+	
+ * @license This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2.1 of the License, or (at your option) any later version.
+ *
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *       Lesser General Public License for more details.
+ *
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library; if not, write to the Free Software
+ *      Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 load("operpart.mac");
 
 protectvars(expr, oper, lst):=block(
@@ -45,7 +61,7 @@ laparrange(expr):=block([xx, tt, ss, l, r, ret, opsubst : true ],
 	else (		
 		if mapatom(expr) then return(expr),
 		ret:subst(lapsymb=lambda([xx, tt, ss], 
-			([l, r]:oppart(xx, lambda([u], freeof(tt, u))),
+			([l, r]:partbyvar(expr, tt),
 				l:subst(nil=1, l),
 				r:subst(nil=1, r)
 			),
@@ -73,148 +89,401 @@ lapsymsubst(expr, dvar):=block([xx, tt, ss, ee],
 /* 
 nesting of patterns
 */
-%matchparams;
+%matchparams:[];
 
 predmatch( expr, match):=block([lv, vv, ee],
 	lv:propvars(matchdeclare),
 	ee:protectvars([expr], match, lv),
 	ee:ev(ee, nouns),
 	if listp(ee) then (
-		for vv in ee do 
-			%matchparams[lhs(vv)]:rhs(vv),
+		for vv in ee do (
+			/*disp(vv),*/
+			%matchparams[lhs(vv)]:rhs(vv)
+			),
 		true
 	)else  ee
 );
 
-
+ /*  simple patterns*/
 matchdeclare( 
-	[ %fun, %g ], true, 
-	[ %s, %t, %p, %q ], atom 
+	/* expressions*/
+	[ %fun, %g, %h ], true, 
+	/* variables*/
+	[ %s, %t], lambda([u], symbolp (u) and u#%e and u#%pi and u#%gamma),
+	/*  parameters, can be numeric*/
+	[ %p, %q, %r ], mapatom 
 );
 
- /*  simple patterns*/
+ /*  transform patterns*/
 defmatch (lapargs, 'ilt(%fun, %s, %t) );
-defmatch (laphypgeo, %f[%p, %q] );
-defmatch (lapratio, %g*%s^(-1) );
+defmatch (lapargs2, 'laplace(%fun, %t, %s) );
 
-defmatch (lapratiop, %fun*%s^(-%p) );
+defmatch (laphypgeo, %f[%p, %q] );
+
+/*  integer-order integrator*/
+defmatch (lapratio, %g*%s^(-1) );
+/*  fractional integrator*/
+defmatch (lapratiop, %fun*%s^(-%g) );
 defmatch (lapratiop2, %fun/(%s +%q)^(%g) );
 
 defmatch (lapexpp, %fun*%e^(%g) );
 defmatch (lapexp1, %fun*%e^(%s*%p) );
+defmatch (lapexp2,  %g*%s^%q );
 
 
 /*
 patterns with radicals
 presumably for bessel functions
 */
+/* I/J pattern*/
+defmatch (lapratiosqrt10, %fun*(%s^2 + %gg)^(-1/2-%g) );
 
-defmatch (lapratiosqrt1, %fun*(%s^2 + %p^2)^(-1/2-%q) );
-defmatch (lapratiosqrt11, %fun*(%s^2 - %p^2)^(-1/2-%q) );
-
+/*
+defmatch (lapratiosqrt11, %fun*(%s^2 + %p^2)^(-1/2-%g) );
+defmatch (lapratiosqrt12, %fun*(%s^2 - %p^2)^(-1/2-%g) );
+*/
+defmatch (lapsqrt1, %fun*(%s^2 + %g)^(1/2) );
 defmatch (lapsqrt2, %fun*(%s^2 + %p^2)^(1/2) );
 defmatch (lapsqrt21, %fun*(%s^2 - %p^2)^(1/2) );
 
 defmatch (lapratiop3, %fun*%s^(%g) );
 
 matchdeclare( 
-	%sqp1, lambda([uu], predmatch( uu, lapsqrt2)),
-	%sqp11, lambda([uu], predmatch( uu, lapsqrt21)),
-	%sqp11, lambda([uu], predmatch( uu, lapsqrt21)),
-	%sratio, lambda([uu], predmatch( uu, lapratio)),
-	%sratiop, lambda([uu], predmatch( uu, lapratiop)),
-	%sratiop2, lambda([uu], predmatch( uu, lapratiop3))
+	%gg, 	 freeof(%s),
+	%sqp1,    lambda([uu], predmatch( uu, lapsqrt1) ),
+	%sqp11,   lambda([uu], predmatch( uu, lapsqrt21) ),
+	%sqp12,   lambda([uu], predmatch( uu, lapsqrt2) ),
+	%sratio,   lambda([uu], predmatch( uu, lapratio) ),
+	%sratiop,  lambda([uu], predmatch( uu, lapratiop) ),
+	%sratiop2, lambda([uu], predmatch( uu, lapratiop3) ),
+	%sfr1,    lambda([uu], predmatch( uu,  lapexp2) )
 );
 
 defmatch (lapratiosqrt2, %fun*(%sqp1+ %s )^(-%q) ) ;
 defmatch (lapratiosqrt21, %fun*(%sqp11+ %s )^(-%q) ) ;
+
+defrule(mlsimp1, %E[%p, %q, %r], if %r=1 then %E[%p, %q] else %E[%p, %q, %r]);
+defrule(mlsimp2, %E[%p, %q ], if %q=1 then %E[%p] else %E[%p, %q]);
+
+
+mlcoeff[k](a, b, g, x):=gamma (g + k)/gamma(k+1)/gamma(a*k+b)*x^k;
+mhgcoeff[k](a, b, c, x):=gamma(a+k)*gamma(b+k)/gamma(k+1)/gamma(k + c)*x^k;
+/*
+Mittag-Leffler function simplification
+*/
+mlsimp(mlexpr):= block([ret, l:1, r, sargs, a1, a2, a3, xx, inpart:false ],
+	if freeof(%E, mlexpr) then return(mlexpr),
+	ret:apply1(mlexpr, mlsimp1, mlsimp2),
+	if op(op(ret))#%E then
+		[l, ret]: subst(nil=1, partbyvar(mlexpr, %E))
+	else ret:mlexpr,
+	xx:inargs(ret),
+	if listp(xx) then xx:first(xx),
+	sargs:args(op(ret)),
+	disp(sargs),
+	if length(sargs)=1 then (
+		a1:first(sargs),
+		if a1=0 then ret:1/(1-xx)
+		elseif a1=1/2 then ret:exp(xx)*erfc(-sqrt(xx))
+		elseif a1=1 then ret:exp(xx)
+		elseif a1=2 then ret:cosh(sqrt(xx))
+		elseif a1=3 then (
+			xx:xx^(1/3), 
+			ret:1/2*(exp(xx) +2*exp(-1/2*xx  )*cos(sqrt(3/2)*xx)  )
+		)elseif a1=4 then 
+			xx:xx^(1/4), 
+			ret:1/2*(cosh(sqrt(xx) +cos(xx))
+		)
+	) elseif length(sargs)=2 then (
+		[a1, a2]:sargs,
+		if a1=1 and a2=2 then ret: (exp(xx)-1)/xx,
+		if a1=2 and a2=2 then ret: sinh(sqrt(xx))/sqrt(xx)
+	) elseif length(sargs)=3 then (
+		[a1, a2, a3]:sargs,
+		if a1=2 and a2=1 and a3=1/2 then  (
+				ret: bessel_i(0, sqrt(xx))
+				)
+	),
+	l*ret
+);
 
 /*
 patterns with exponentials
 presumably for error functions
 delta function, unit step
 */
-defmatch (lapexpp, %fun*%e^(%g * sqrt(%s) ));
-defmatch (lapexprat,  %fun*%e^(%sratio) ) ;
+
+/* pattern to detect shifing */
+defmatch(lprod, %p*%q);
+matchdeclare( %lprod,   lambda([uu], predmatch( uu, lprod)));
+defmatch (lapexpp3, %fun*%e^(-%lprod) );
+matchdeclare( %lapexpshift,   lambda([uu], predmatch( uu, lapexpp3)));
+
+ilapshiftarg2(expr, %lvar, %tvar):=block([%fun, %lprod, a ],
+	if  lapexpp3(expr) # false then ( 
+		a:%lprod/%lvar,
+		[unit(%tvar-a), ilt(%fun, %lvar, %tvar)]
+	) else [1, expr ]
+);
+
+defmatch (lapexprat2,  %sratiop*%e^(%sratio) ) ;
+defmatch (lapexprat31,   %e^(%sfr1) ) ;
+defmatch (lapexprat3,  %sratiop*%e^(%sfr1) ) ;
+defmatch (laplog1,  %sratio*log(%s) ) ;
+
+/*
+hypergeometric patterns
+*/
+matchdeclare([%lsta, %lstb], listp); 
+defmatch (laphgf,  %sratiop*%f[%p,%q](%lsta, %lstb, %sratio)) ;
 
 /*
 Mittag-Leffler patterns
 */
-defmatch (lapefractee1,  %sratiop2*(%s^%q +%g)^(-1) ) ;
-defmatch (lapefractee2,  %sratiop2*(%s^%q +%g)^(-%p) ) ;
+defmatch (lapefractee2,  %sratiop2*(%s^%q +%g)^(-%p))  ;
+defmatch (lapefractee21,  %sratiop2*(%s^%g +%q)^(-%h))  ;
+defmatch (lapefractee22,  (%s^%g +%gg)^(-%h));
+
+sgn(expr):=if freeof(-1, expr) then 1 else -1;
 
 ilapargs(expr):= block([ %fun, %s, %t], 
 	if lapargs(expr)#false then [ %fun, %s, %t] else false
 );
 
-/*  main  ILT functionality*/
-ilaplace(expr):=block([l, r:1, fun, ret, %tvar, %lvar],
-	if ilaplacexp(expr) then (
-		if inop(expr)=nounify('ilt) then (
-			ret:ilapargs(expr),
-			[fun, %lvar, %tvar]:ilapargs(expr)
-		)else (
-			[l, r]:oppart(expr, ilaplacexp),
-			/*display(l, r),*/
-			[fun, %lvar, %tvar]:ilapargs(l)
-		),
-		display(%lvar, %tvar),	
-		ret: r* intablelapfun(fun)
-	)
-	else ret:expr,
-	ret
+laprepare(expr):=block([ radexpand :all],
+	if inop(expr)="+" then map(lambda([u], laprepare(u)), expr)
+	else factor(radcan(expr))
 );
 
+/*  main  ILT functionality*/
+ilaplace(expr):=block([l, r:1, fun, sfun, ret:false, %tvar, %lvar, ww, zz:1, sop],
+	if ilaplacexp(expr) then (
+		sop: inop(expr),
+		if sop="+" then (
+			/* removes side effects*/
+			remarray(%matchparams),	
+			ret:map(lambda([u], ww: laprepare (u), ilaplace(ww)), 
+			expr)
+		)else(			
+			if sop=nounify('ilt) then (
+				[fun, %lvar, %tvar]:ilapargs(expr)				
+			) else (
+				[l, r]:oppart(expr, ilaplacexp),
+				/* display(l, r), */
+				[fun, %lvar, %tvar]:ilapargs(l)
+			),
+			/* shift  pattern injected here */
+			[zz, sfun]: ilapshiftarg2(expr, %lvar, %tvar),		
+			display(sfun, zz, fun),
+			if ilaplacexp(sfun) then
+				ret: r* intablelapfun(fun, %lvar)
+			else ret: r*sfun
+		)
+	)
+	else ret:false,
+	if freeof(false, ret) then
+		ret:zz*ret else ret:expr,
+	ret
+);
 
 /*
  main table  lookup functionality
 */
-
-intablelapfun(expr):= block([ops: op(expr), ret, u, v, %p, %s, %q, %fun],
+intablelapfun(expr, lvar):= block(
+	[ops: inop(expr), ret:false, u, v, %matchparams, %p, %s, %q, %fun, %g ],
 	if symbolp(ops) then 
-		apply(laptable[ops], args(expr))
-	elseif ops="/" then (
-		disp(expr),
-		if freeof(%e, expr) then 
-		/* Bessel functions, case 1*/
-		if lapratiosqrt1(expr)#false then (		
-			display(%fun, %p, %s ),
-			/* bessel_j*/
-			if freeof(%lvar, %fun) then (
-				if %p#%lvar then ret:laptable["bef2"](%p, %q)
-				else ret:laptable["bef2"](%s, %q),
-				ret:ret*%fun
-				)
-			else
-				ret:laptable["bef3"](%fun)
-		)elseif lapratiosqrt11(expr)#false then (		
-			display(%fun, %p, %s ),
-			/* bessel_i*/
-			if freeof(%lvar, %fun) then (
-				if %p#%lvar then ret:laptable["bef21"](%p, %q)
-				else ret:laptable["bef21"](%s, %q),
-				ret:ret*%fun
-				)
-			else
-				ret:laptable["bef31"](%fun)
-		) else	
-			ret:laptable["/"](expr)	
-		else
-			/* Bessel functions, case 2*/
-			ret:laptable["bef1"](expr)
+		ret:laptable[ops](expr)  
+	elseif  predmatch( expr, lapratiosqrt10) then (
+		disp("Bessel J, radical", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["bef2"](%matchparams['%gg], %matchparams['%g]),
+		if besselexpand =true then
+			ret:rootscontract(radcan(ret))
 		)
-	else	ret:laptable[nil],
+	elseif  predmatch( expr, lapexprat2) then (
+		disp("Bessel I/J, exp * frat ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["bef1"](%matchparams['%sratio], %matchparams['%sratiop]),
+		if besselexpand =true then
+			ret:rootscontract(radcan(ret))
+		)
+	elseif  predmatch( expr, lapratiosqrt2) then (
+		disp("Bessel I/J,  1/t ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		if mapatom(%matchparams['%fun]) then
+			ret:laptable["bef3"](%matchparams['%sqp1], %matchparams['%q]),
+		if besselexpand =true then
+			ret:rootscontract(radcan(ret))
+		)
+	elseif  predmatch( expr, lapexprat31) then (
+		disp("Exp/ Wright ", arrayinfo(%matchparams), listarray (%matchparams) ),
+ 		ret:laptable["exp1"](%matchparams['%sfr1])
+		)
+	elseif  predmatch( expr, lapexprat3) then (
+		disp("Erfc/ Wright ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		predmatch( %matchparams['%sratiop], lapratiop), 
+		ret:laptable["erf1"](%matchparams['%sfr1], %matchparams['%sratiop])
+	)
+	elseif  predmatch( expr, lapefractee2) then (
+		disp("Mittag-Leffler 3/2/1 parameter ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["ml3"](%matchparams['%sratiop2],  %matchparams['%q], %matchparams['%p], %matchparams['%g])
+	)
+	elseif  predmatch( expr, lapefractee21) then (
+		disp("Mittag-Leffler 3/2/1 parameter ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["ml3"](%matchparams['%sratiop2],  %matchparams['%g], %matchparams['%h], %matchparams['%q])
+	) elseif  predmatch( expr, lapefractee22) then (
+		disp("Mittag-Leffler 3/2/1 parameter ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["ml31"]( %matchparams['%g], %matchparams['%h], %matchparams['%gg])
+	)
+	elseif  predmatch(expr, laplog1) then (
+		ret:laptable["log"](sgn(%matchparams['%sratio]))
+	)
+	elseif  predmatch( expr, laphgf) then (
+		disp("hypergeometric ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["hgf"](%matchparams['%sratiop],  %matchparams['%sratio], %matchparams['%lsta], %matchparams['%lstb])
+	)
+	elseif  predmatch( expr, lapratiop) then (
+		disp("fractional power ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["fp"](%matchparams['%fun],   %matchparams['%g])
+	)
+	else	ret:false,
 	ret
 );
+
+/* fractional power*/
+laptable["fp"]: lambda([u, v],  
+	block([%fun, %p, %q, %s, lst], (
+	disp(u, v),
+	if not mapatom(u) then false else (
+		 %tvar^(v-1)/gamma(v)
+		)
+	)
+	)
+);
+
+laptable["log"]: lambda([u],  u*( -log(%tvar)-%gamma) );
+
+ /*
+ hypergeometric
+ %f [p,q] ([a],[b],z) 
+ */
+laptable["hgf"]: lambda([rp, rr, la, lb],  
+	block( [ %s, %g, lst, p, a, %p, %fun, n, m, laa, lbb ],
+		 (lapratiop(rp)), p:%g,
+		 (lapratio(rr)), a:%g,
+		 laa:copy(la),
+		 lbb:copy(lb),
+		 n:length(la),
+		 m:length(lb),
+		 laa[n]:laa[n]-p,
+		 if laa[n]= 0 then (
+			laa:rest(laa, -1),
+			n:n-1
+			),
+		 hgfred(laa, lbb, a*%tvar) * %tvar^(p-1)/gamma(p)
+		)
+);
+
+
+
+/* Mattag- Leffler 3 parameter*/
+laptable["ml3"]: lambda([ uv, a, gam, g], 
+	block([ %g, %fun, %g, %s,  b],
+		disp(lapratiop3(uv)),
+		b:-ratsimp(%g-a*gam),
+		%fun: %tvar^(b-1) * %E[ a, b, gam](-g* %tvar^a),
+		mlsimp(%fun)
+	)
+);
+
+laptable["ml31"]: lambda([  a, gam, g], 
+	block([ %g, %fun, %g, %s,  b],
+		b:ratsimp(a*gam),
+		%fun: %tvar^(b-1) * %E[ a, b, gam](-g* %tvar^a),
+		mlsimp(%fun)
+	)
+);
+
+ 
+/* Erf related patterns 
+ special functions
+wright(alpha, beta )(x)
+%M (alpha) (x) 
+ Wright function
+*/
+
+gradef (wright (a, b, x),  
+'diff(wright(a, b, x), a),  
+'diff(wright(a, b, x), b), 
+wright(a, a+b, x) );
+
+/*
+ Mainardi function
+*/
+%M(a, x):=wright(-a,1-a,x);
+
+/*
+ Wirght function simplification
+*/
+wrightsimp(wexpr):=block([ l, r, sargs, ret ],
+	if freeof (wright, wexpr) then return (wexpr),
+	if inop(wexpr)='wright then (
+		ret:wexpr,
+		sargs:args( wexpr),
+		if sargs[1]=-1/2 and sargs[2]=1 then
+			ret:erfc(-sargs[3]/2),
+		if sargs[1]=-1/2 and sargs[2]=1/2 then
+			ret:exp(-sargs[3]^2/4)/sqrt(%pi),
+		if sargs[1]=-1/3 and sargs[2]=2/3 then
+			ret: 3^(2/3)*airy_ai ( sargs[3]/3^(1/3)),
+		if sargs[1]=-2/3 and sargs[2]=1/3 then
+			ret: exp( -2*sargs[3]^3/27 ) *(1/27*  sargs[3]*airy_ai ( sargs[3]^2/3^(4/3)) - 3^(1/3)*airy_dai( sargs[3]^2/3^(4/3)))
+	) else (
+		[l, r]: partbyvar(wexpr, wright),
+		l:subst(nil=1, l),
+		ret:l * wrightsimp(r)
+	),
+	ret
+);
+
+laptable["exp1"]: lambda([u], 
+	block([ %g, %q, %s, k ],
+		disp("exp / wright ", lapexp2(u)),	k:-%g,
+		if %q#1/2 then 
+			k*%q/%tvar^(1+%q)*wright([-%q, 1- %q ] , -1/%tvar^(%q) * k)
+		else 
+			k/2/sqrt(%pi)/%tvar^(1+%q)*exp(-1/4/%tvar*k^2) 
+	)
+);
+
+laptable["erf1"]: lambda([u, v],  
+	block([ %fun, p, k, %s, %g, p ],
+		/*disp("erf 1/ wright integral ", lapexp2(u)), 	*/
+		lapexp2(u),
+		k:-%g,  q:%q,
+		 (lapratiop(v)),
+		p:%g,
+		/*display(q, p),*/
+		if q=1/2 and p=1 then 
+			%fun:erfc(k/2*%tvar^(-q)),
+		if q=1/2 and p=3/2 then 
+			%fun:k*2/sqrt(%pi)*%tvar^(%q)*exp(-1/4/%tvar*k^2)  -k*erfc(k/2*%tvar^(-q))
+		else 
+			%fun:1/%tvar^(1-p)*wright(-q, p, -k/%tvar^q),
+		%fun			
+	)
+);
+
 
 /*
  lookup table closure
  and  interface pattern
 */
-laptable[nil]: lambda([u],   false);
+laptable[nil]:lambda([u], u*delta(%tvar)  );
 
 /*
 Lookup tables
+*/
+
+/*
+ arctan
 */
 laptable[arctan]: lambda([u],  
 	block([ l, r],
@@ -225,70 +494,46 @@ laptable[arctan]: lambda([u],
 	)
 );
 
-laptable[log]: lambda([u],  
-	block([%a, %b],
-		u:first(u),
-		if op(u)#"/" then false else (
-		%a:num(u)-s,
-		%b:denom(u)-s,
-		1/%tvar *(exp (%b*%tvar) - exp (%a*%tvar))
-		)
-	)
-);
 
-laptable["bef2"]: lambda([u, v], 
-	 if v=-1/2 then false else sqrt(%pi)*%tvar^(v)*bessel_j(v, u*%tvar)/(2*u)^v/gamma(v+1/2) );
+
+
+/*	 
 laptable["bef21"]: lambda([u, v], 
-	 if v=-1/2 then false else sqrt(%pi)*%tvar^(v)*bessel_i(0, u*%tvar)/(2*u)^v/gamma(v+1/2) );
-
+	 if v=-1/2 then false else sqrt(%pi)*%tvar^(v)*bessel_i(v, u*%tvar)/(2*u)^v/gamma(v+1/2) );
+*/
 /*   exp -> bessel_j  bessel_i*/
 
-laptable["bef1"]: lambda([u],  
-	block([%fun, %p, %s, %g, besselexpand:true ],
-		if op(u)#"/" then false else (
-		disp(lapexpp(u)),
-		%p:-hipow(%fun, %lvar),
-		(lapratio(%g)),
-		if not freeof(-1, %fun) then
-			%g:(-%tvar/%fun)^((%p-1)/2) * bessel_j(%p-1, 2*sqrt(-%fun * %tvar) )
+laptable["bef1"]: lambda([u, v],  
+	block([ %fun, p, k, %s, %g  ],
+		disp(lapratio(u)), 	k:%g,  
+		disp(lapratiop(v)), p:%g,
+		if not freeof(-1, k) then
+			%fun:(-%tvar/k)^((p-1)/2) * bessel_j(p-1, 2*sqrt(-k * %tvar) )
 		else
-			%g:(%tvar/%fun)^((%p-1)/2) * bessel_i(%p-1, 2*sqrt(%fun * %tvar) ),
-		rootscontract(radcan(%g))
-		)
+			%fun:(%tvar/k)^((p-1)/2) * bessel_i(p-1, 2*sqrt(k * %tvar) ),
+		%fun
 	)
 );
 
-
-
-/* fractional power*/
-laptable["/"]: lambda([u],  
-	block([%fun, %p, %q, %s, lst],
-		if op(u)#"/" then false else (
-		disp(lapratiop(u)),
-		if laphypgeo(inop(%fun))#false  then (
-			laptable["%f[p,q]"] (%fun)
-	/*	)elseif (
-		*/
-		)
+laptable["bef2"]: lambda([u, v], block([ %fun,  k, %s, %q, %p  ],
+	 if v=-1/2 then false else (
+		if sgn(k)=1 then
+			sqrt(%pi)*%tvar^(v)*bessel_j(v, sqrt(u)*%tvar)/(2*u)^v/gamma(v+1/2) 
 		else
-		%tvar^(%p-1)/gamma(%p)
+			sqrt(%pi)*%tvar^(v)*bessel_i(v, sqrt(-u)*%tvar)/(2*u)^v/gamma(v+1/2) 
 		)
+	 
 	)
 );
 
- 
- /*
- hypergeometric
- %f [p,q] ([a],[b],z) 
- */
- 
-laptable["%f[p,q]"]: lambda([u],  
-	block( [ %s, lst, l, %p, %fun ],
-		lst:args(u),
-		l:rest(lst[1],-1),
-		(lapratiop(lst[3])),
-		%f[ length(l), length( lst[2]) ](l, lst[2], %tvar^%p)
-		)
+laptable["bef3"]: lambda([u, q],  
+	block([ %fun, p, k, %s, %g, %p ],
+		disp(lapsqrt1(u)), 	k:%g,  
+		if not freeof(-1, k) then
+			%fun: q*sqrt(-1/k)^q * bessel_i(q, sqrt(-k) * %tvar ) /%tvar
+		else
+			%fun: q/sqrt(k^q) * bessel_j(q,  sqrt(k) * %tvar ) /%tvar,
+		%fun
+	)
 );
-
 
