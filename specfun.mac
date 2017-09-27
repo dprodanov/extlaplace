@@ -1,0 +1,160 @@
+/**
+Maxima package for Inverse Laplace transforms
+
+package for special functions
+Mittag-Leffler function
+Wright function
+Mainardi function
+
+conventions:
+
+	%variables: matching variables, global scope, suffer from side effects
+	funcionp: predicate
+	
+	version 1.0 Date 17 Sept 2017
+	
+ * @license This library is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU Lesser General Public
+ *      License as published by the Free Software Foundation; either
+ *      version 2.1 of the License, or (at your option) any later version.
+ *
+ *      This library is distributed in the hope that it will be useful,
+ *      but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *       Lesser General Public License for more details.
+ *
+ *      You should have received a copy of the GNU Lesser General Public
+ *      License along with this library; if not, write to the Free Software
+ *      Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+defrule(mlsimp1, %E[%p, %q, %r], if %r=1 then %E[%p, %q] else %E[%p, %q, %r]);
+defrule(mlsimp2, %E[%p, %q ], if %q=1 then %E[%p] else %E[%p, %q]);
+
+
+mlcoeff[k](a, b, g, x):=gamma (g + k)/gamma(k+1)/gamma(a*k+b)*x^k;
+mhgcoeff[k](a, b, c, x):=gamma(a+k)*gamma(b+k)/gamma(k+1)/gamma(k + c)*x^k;
+
+/*
+Mittag-Leffler function simplification
+*/
+mlsimp(mlexpr):= block([ret, l:1, r, sargs, a1, a2, a3, xx, inpart:false ],
+	if freeof(%E, mlexpr) then return(mlexpr),
+	ret:apply1(mlexpr, mlsimp1, mlsimp2),
+	if inop(inop(ret))#%E then
+		[l, ret]: subst(nil=1, partbyvar(mlexpr, %E)),
+	xx:inargs(ret),
+	if listp(xx) then xx:first(xx),
+	sargs:args(op(ret)),
+	if length(sargs)=1 then (
+		a1:first(sargs),
+		disp(a1),
+		if a1=0 then ret:1/(1-xx)
+		elseif a1=1/2 then ret:exp(xx^2)*erfc(-xx)
+		elseif a1=1 then ret:exp(xx)
+		elseif a1=2 then ret:cosh(sqrt(xx))
+		elseif a1=3 then (
+			xx:xx^(1/3), 
+			ret:1/2*(exp(xx) +2*exp(-1/2*xx  )*cos(sqrt(3/2)*xx)  )
+		)elseif a1=4 then (
+			xx:xx^(1/4), 
+			ret:1/2*(cosh(sqrt(xx)) +cos(xx))
+		),
+		return(l*ret)
+	) elseif length(sargs)=2 then (
+		[a1, a2]:sargs,
+		if a1=1 and a2=2 then ret: (exp(xx)-1)/xx,
+		if a1=2 and a2=1 then ret: cosh(sqrt(xx)),
+		if a1=2 and a2=2 then ret: sinh(sqrt(xx))/sqrt(xx),
+		return(l*ret)
+	) elseif length(sargs)=3 then (
+		[a1, a2, a3]:sargs,
+		if a1=2 and a2=1 and a3=1/2 then  (
+				ret: bessel_i(0, sqrt(xx))
+				)
+	),
+	l*ret
+);
+
+
+gradef (wright (a, b, x),  
+'diff(wright(a, b, x), a),  
+'diff(wright(a, b, x), b), 
+wright(a, a+b, x) );
+
+gradef (%E (a, b, c, x),  
+'diff(%E(a, b, c, x), a),  
+'diff(%E(a, b, c, x), b), 
+'diff(%E(a, b, c, x), c), 
+ (%E (a, b-1, c, x) - (b-1) * %E (a, b, c, x))/(a*x)  );
+ 
+/*
+ Mainardi function
+*/
+%M(a, x):=wright(-a,1-a,x);
+
+/*
+ Wirght function simplification
+*/
+wrightsimp(wexpr):=block([ l, r, sargs, ret ],
+	if freeof (wright, wexpr) then return (wexpr),
+	if inop(wexpr)='wright then (
+		ret:wexpr,
+		sargs:args( wexpr),
+		if sargs[1]=0 then
+		 if  integerp( sargs[2]) and  sargs[2] <=0  then ret:0 else 
+			ret:exp(sargs[3])/gamma(sargs[2]),
+	 	if sargs[1]=1 then
+			if sgn(sargs[3])=1 then
+				ret:bessel_i(sargs[2]-1, 2 *sqrt(sargs[3])) / sargs[3]^( (sargs[2]-1)/2)
+			else 
+				ret:bessel_j(sargs[2]-1, 2 *sqrt(-sargs[3])) / (-sargs[3])^( (sargs[2]-1)/2),
+		if sargs[1]=-1/2 and sargs[2]=1 then
+			ret:erfc(-sargs[3]/2),
+		if sargs[1]=-1/2 and sargs[2]=1/2 then
+			ret:exp(-sargs[3]^2/4)/sqrt(%pi),
+	/*	if sargs[1]=-1/2 and sargs[2]=3/2 then
+			ret:2*exp(-sargs[3]^2/4)/sqrt(%pi)*sargs[3] - erfc(-sargs[3] )*sargs[3],*/
+		if sargs[1]=-1/3 and sargs[2]=2/3 then
+			ret: 3^(2/3)*airy_ai ( sargs[3]/3^(1/3)),
+		if sargs[1]=-2/3 and sargs[2]=1/3 then
+			ret: exp( -2*sargs[3]^3/27 ) *(1/27*  sargs[3]*airy_ai ( sargs[3]^2/3^(4/3)) - 3^(1/3)*airy_dai( sargs[3]^2/3^(4/3)))
+	) else (
+		[l, r]: partbyvar(wexpr, wright),
+		l:subst(nil=1, l),
+		ret:l * wrightsimp(r)
+	),
+	ret
+);
+
+mlexpand(a, b, g, x):=block([ m, lst, dd, gs: gensym("g"), listarith:true ],
+	if not numberp(a) or g=0 then return (%E[a, b, g](x)),
+	if a<0 then return (%E[a, b, g](x)),
+	m:ceiling(a),
+	lst:args(pochhammer (gs, m))/m,
+	lst:subst(gs=g, lst),
+	disp(lst),
+	hgfred([g], lst, x/m^m)/gamma(g)
+);
+
+rationalp(x):=not atom(x) and numberp(x) or integerp(x);
+
+/*
+sgn(expr):=if freeof(-1, expr) then 1 else -1;
+	
+wexpand(a, b,  x):=block([n, k, m, lst1, lst2,  u, listarith:true, ss:0, s ],
+	if not rationalp(a) then return ('wright(a, b, x)),
+	s: sgn(a),
+	n:abs(num(a)), m:denom(a),
+	for p: 0 thru m-1 do (
+		if a>=-1 then
+		if a*p+b#0 then (
+			lst1: makelist(k/n, k, 0, n-1) + (b)/n+p/m,
+			lst2: makelist(k/m, k, 0, m-1)+(p+1)/m,
+			lst2: sublist(append(lst1, lst2), lambda( [u], u#1)),
+			disp(%f([], lst2 , x^m/m^m/n^n)),
+			ss:ss+ 1/gamma(p+1)/gamma(a*p+b)*x^p *hgfred([], lst2, x^m/m^m/n^n)
+		) 
+	),
+	ss
+);
+*/
