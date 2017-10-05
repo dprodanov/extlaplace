@@ -62,9 +62,8 @@ laparrange(expr):=block([xx, tt, ss, l, r, ret, opsubst : true ],
 	if inop(expr)="+" then 
 		ret:map(laparrange, expr)
 	else (		
-		if mapatom(expr) then return(expr),
 		ret:subst(lapsymb=lambda([xx, tt, ss], 
-			([l, r]:partbyvar(expr, tt),
+			([l, r]:partbyvar(xx, tt),
 				l:subst(nil=1, l),
 				r:subst(nil=1, r)
 			),
@@ -77,12 +76,13 @@ laparrange(expr):=block([xx, tt, ss, l, r, ret, opsubst : true ],
 );
 
 /* Laplace transform manupulations */
-lapsymsubst(expr, dvar):=block([xx, tt, ss, ee], 
+lapsymsubst(expr, dvar):=block([xx, tt, ss, ee, ret], 
+	ret:laparrange(expr),
 	subst( lapsymb=lambda([xx, tt, ss], 
 			ee:buildq([dvar], depends(dvar, ss)), 
 			ev(ee, nouns),
 			dvar), 
-	expr) 
+	ret) 
 );	
 
 /* [Pattern matching*/
@@ -113,6 +113,11 @@ predmatch( expr, match):=block([lv, vv, ee],
 	)else  ee
 );
 
+/*tmatchdeclare(%x, true);
+tellsimpafter(atanh(tanh(%x)), %x);
+tellsimpafter(sin(%x)/cos(%x), tan(%x));
+ellsimpafter(cos(%x)/sin(%x), cot(%x));*/
+
  /*  simple patterns*/
 matchdeclare( 
 	/* expressions*/
@@ -135,7 +140,7 @@ defmatch (lapratio, %g*%s^(-1) );
 defmatch (lapratiop, %fun*%s^(-%g) );
 /*  fractional differentiator*/
 defmatch (lapfrexp2,  %g*%s^%q );
-
+defmatch (lapfrexp21,  %g*%s^%q, %s);
 /*
 patterns with radicals
 presumably for bessel functions
@@ -290,21 +295,21 @@ intablelapfun(expr, lvar):= block(
 		)
 	elseif  predmatch( expr, lapexprat31) then (
 		disp("Exp/ Wright ", arrayinfo(%matchparams), listarray (%matchparams) ),
- 		ret:laptable["exp1"](%matchparams['%sfr1])
+ 		ret:laptable["exp1"](%matchparams['%sfr1], lvar)
 		)
 	elseif  predmatch( expr, lapexprat3) then (
 		disp("Erfc/ Wright /fractional", arrayinfo(%matchparams), listarray (%matchparams) ),
 		predmatch( %matchparams['%sratiop], lapratiop), 
-		ret:laptable["erf1"](%matchparams['%sfr1], %matchparams['%sratiop])
+		ret:laptable["erf1"](%matchparams['%sfr1], %matchparams['%sratiop], lvar)
 	)
 	elseif  predmatch( expr,   lambda([u],  'lapexprat33(u, lvar))) then (
 		disp("Erfc/ Wright ", arrayinfo(%matchparams), listarray (%matchparams) ),
-		ret:laptable["exp2"](%matchparams['%sfr2], %matchparams['%gg])
+		ret:laptable["exp2"](%matchparams['%sfr2], %matchparams['%gg], lvar)
 	)
 	elseif  predmatch( expr, lambda([u],  'lapexprat34(u, lvar))) then (
 		disp("Erfc/ Wright /fractional", arrayinfo(%matchparams), listarray (%matchparams) ),
 		predmatch( %matchparams['%sratiop], lapratiop), 
-		ret:laptable["erf2"](%matchparams['%sfr2], %matchparams['%sratiop], %matchparams['%gg])
+		ret:laptable["erf2"](%matchparams['%sfr2], %matchparams['%sratiop], %matchparams['%gg], lvar)
 	)
 	elseif  predmatch( expr, lapefractee2) then (
 		disp("Mittag-Leffler 3/2/1 parameter ", arrayinfo(%matchparams), listarray (%matchparams) ),
@@ -396,32 +401,34 @@ wright(alpha, beta )(x)
 */
 
 
-laptable["exp1"]: lambda([u], 
+laptable["exp1"]: lambda([u, ss], 
 	block([ %g, %q, %s, k, %fun, q ],
-		disp("exp / wright ", lapfrexp2(u)),	k:%g, q:%q,
+		disp("exp / wright ", lapfrexp21(u, ss)),	k:%g, q:%q,
 		%fun:k*q/%tvar^(1+q)*wright(-q, 1-q , 1/%tvar^(%q) * k),
 	/*	if %q#1/2 then 
 			k*%q/%tvar^(1+%q)*wright(-%q, 1- %q , -1/%tvar^(%q) * k)
 		else 
 			k/2/sqrt(%pi)/%tvar^(1+%q)*exp(-1/4/%tvar*k^2),*/
+
 		wrightsimp(%fun)	
 	)
 );
 
-laptable["exp2"]: lambda([u, k], 
+laptable["exp2"]: lambda([u, k, ss], 
 	block([ %h, %g, %q, %p, %s, q, tt, %fun, g ],
-		disp("exp / wright ", lapratiop4(u, lvar)), q:%h, g:%g,
+		disp("exp / wright ", lapratiop4(u, ss)), q:%h, g:%g,
 		tt:%tvar/%p,
 		%fun:k*q/%p*exp(-g*tt)/tt^(1+q)*wright( -q, 1- q , -1/tt^(q) * k),
 		wrightsimp(%fun)
 	)
 );
 
-laptable["erf1"]: lambda([u, v],  
+laptable["erf1"]: lambda([u, v, ss],  
 	block([ %fun, k, %s, %g, p ],
-		lapfrexp2(u),
+		if sgn(u)=1 then return(false),
+		disp(lapfrexp21(u, ss)),
 		k:%g,  q:%q,
-		disp("exp / wright ", lapratiop(v)), p:%g,
+		disp("erf1", lapratiop(v)), p:%g,
 		/*display(q, p),*/
 	/*	if q=1/2 and p=1 then 
 			%fun:erfc(k/2*%tvar^(-q)),
@@ -434,9 +441,9 @@ laptable["erf1"]: lambda([u, v],
 );
 
 
-laptable["erf2"]: lambda([u, v, k],  
+laptable["erf2"]: lambda([u, v, k, ss],  
 	block([ %fun, %p, %s, %g, p ],
-		disp("exp / wright ", lapratiop4(u, lvar)), q:%h, g:%g,
+		disp("exp / wright ", lapratiop4(u, ss)), q:%h, g:%g,
 		tt:%tvar/%p, 
 		 disp(lapratiop(v)), p:%g,
 		/*	display(q, p, %p),
