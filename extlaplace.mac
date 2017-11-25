@@ -94,6 +94,7 @@ nesting of patterns
 
 _debug:false;
 
+/*  boxed matching of predicates independent of variables*/
 predmatch( expr, match):=block([lv, vv, ee],
 	lv:propvars(matchdeclare),
 	if not listp(expr) then
@@ -113,7 +114,32 @@ predmatch( expr, match):=block([lv, vv, ee],
 	)else  ee
 );
 
-/*tmatchdeclare(%x, true);
+/*  boxed matching of predicates dependent of variables*/
+predmatchv( expr, match, svar):=block([lv, vv, ee],
+	lv:propvars(matchdeclare),
+	if not listp(svar) then svar:[svar],
+	if not listp(expr) then
+		expr:append([expr], svar)
+	else  expr:append(expr, svar),
+	if _debug then display( expr), 
+	if not listp(expr) then
+		ee:protectvars([expr], match, lv)
+	else 
+		ee:protectvars(expr, match, lv),
+	if _debug then disp(ee),
+	ee:ev(ee, nouns),
+	if listp(ee) then (
+		for vv in ee do (
+			if _debug then display(vv),
+			errcatch (
+			%matchparams[lhs(vv)]:rhs(vv)
+			)
+			),
+		true
+	)else  ee
+);
+
+/*matchdeclare(%x, true);
 tellsimpafter(atanh(tanh(%x)), %x);
 tellsimpafter(sin(%x)/cos(%x), tan(%x));
 ellsimpafter(cos(%x)/sin(%x), cot(%x));*/
@@ -181,7 +207,7 @@ presumably for error functions
 delta function, unit step
 */
 defmatch (lapexpp, %fun*%e^(%sg) );
-defmatch (lapexp1, %fun*%e^(%s*%p) );
+
 defmatch (lapexprat2,  %sratiop*%e^(%sratio) ) ;
 defmatch (lapexprat31,   %e^(%sfr1) ) ;
 defmatch (lapexprat3,  %sratiop*%e^(%sfr1) ) ;
@@ -204,6 +230,9 @@ ilapshiftarg(expr, %lvar, %tvar):=block([%fun, %lprod, a ],
 	) else [1, expr ]
 );
 
+defmatch (lprod1, %s*%p, %s );
+
+defmatch (lapexp4, %fun*%e^(%s*%gg), %s );
 
 defmatch (laplog1,  %sratio*log(%s) ) ;
 
@@ -271,7 +300,7 @@ ilaplace(expr):=block([l, r:1, l2:1, r2:1, %matchparams:[], fun, sfun, ret:false
  main table  lookup functionality
 */
 intablelapfun(expr, lvar):= block(
-	[ops: inop(expr), ret:false, u, v, %matchparams, %p, %s, %q, %fun, %g ],
+	[ops: inop(expr), ret:false, u, v, %matchparams, %p, %s, %q, %fun, %g, %gg ],
 	if symbolp(ops) then 
 		ret:laptable[ops](expr)  
 	elseif  predmatch( expr, lapratiosqrt10) then (
@@ -292,7 +321,11 @@ intablelapfun(expr, lvar):= block(
 			ret:laptable["bef3"](%matchparams['%sqp1], %matchparams['%q]),
 		if besselexpand =true then
 			ret:rootscontract(radcan(ret))
-		)
+	)
+	elseif  predmatchv( expr, lapexp4, lvar) then (
+		disp("Exp/Delta ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:laptable["delta"](%matchparams['%fun], %matchparams['%gg])
+	)
 	elseif  predmatch( expr, lapexprat31) then (
 		disp("Exp/ Wright ", arrayinfo(%matchparams), listarray (%matchparams) ),
  		ret:laptable["exp1"](%matchparams['%sfr1], lvar)
@@ -461,8 +494,9 @@ laptable["erf2"]: lambda([u, v, k, ss],
  lookup table closure
  and  interface pattern
 */
-laptable[nil]:lambda([u], u*delta(%tvar)  );
+laptable[nil]:lambda([u], delta(%tvar)  );
 
+laptable["delta"]:lambda([u, v], u*delta(%tvar+v)  );
 /*
 Lookup tables
 */

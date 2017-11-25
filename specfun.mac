@@ -30,9 +30,22 @@ conventions:
 defrule(mlsimp1, %E[%p, %q, %r], if %r=1 then %E[%p, %q] else %E[%p, %q, %r]);
 defrule(mlsimp2, %E[%p, %q ], if %q=1 then %E[%p] else %E[%p, %q]);
 
+/* coefficients of 3 parameter Mittag-Leffler function*/
+mlcoeff3[k](a, b, g, x):=gamma (g + k)/gamma(k + 1)/gamma(a*k+b)*x^k;
 
-mlcoeff[k](a, b, g, x):=gamma (g + k)/gamma(k+1)/gamma(a*k+b)*x^k;
-mhgcoeff[k](a, b, c, x):=gamma(a+k)*gamma(b+k)/gamma(k+1)/gamma(k + c)*x^k;
+/* coefficients of 2 parameter Mittag-Leffler function*/
+mlcoeff2[k](a, b, x):=1/gamma(a*k+b)*x^k;
+
+/* coefficients of 1 parameter Mittag-Leffler function*/
+mlcoeff2[k](a,  x):=1/gamma(a*k+1)*x^k;
+
+/* coefficients of 3 parameter hypergeometric function*/
+mhgcoeff[k](a, b, c, x):=gamma(a + k)*gamma(b + k)/gamma(k+1)/gamma(k + c)*x^k;
+
+wrightcoeff[k](a, b, x):=1/gamma(a*k+b)*x^k/gamma(k+1);
+/*
+'integrate(t^(b-1)*(1-t)^(c-b-1)/(1-t*z)^a,t, 0, inf)*gamma(c)/gamma(b)/gamma(c-b);
+*/
 
 /*
 Mittag-Leffler function simplification
@@ -100,6 +113,9 @@ wrightsimp(wexpr):=block([ l, r, sargs, ret ],
 	if inop(wexpr)='wright then (
 		ret:wexpr,
 		sargs:args( wexpr),
+	/*	disp (sargs),*/
+		if sargs[2] =0 and integerp(sargs[1]) and sargs[1]<0 then 
+			ret:delta(1+sargs[3])/sargs[3],
 		if sargs[1]=0 then
 		 if  integerp( sargs[2]) and  sargs[2] <=0  then ret:0 else 
 			ret:exp(sargs[3])/gamma(sargs[2]),
