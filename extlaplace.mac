@@ -185,7 +185,7 @@ defmatch (slinear, ( %p*%s + %gg ), %s);
 
  
 matchdeclare( 
-	%gg, 	 freeof(%s),
+	%gg, 	 lambda([uu], freeof(%s, uu) and uu#0),
 	%sg, 	 lambda([uu], not freeof(%s, uu) ),
 	%srad1,   lambda([uu], predmatch( uu, lapratiorad11) ),
 	%sqp1,    lambda([uu], predmatch( uu, lapsqrt1) ),
@@ -230,12 +230,14 @@ ilapshiftarg(expr, %lvar, %tvar):=block([%fun, %lprod, a ],
 	) else [1, expr ]
 );
 
+/*  Miscelaneous patterns */
 defmatch (lprod1, %s*%p, %s );
 
 defmatch (lapexp4, %fun*%e^(%s*%gg), %s );
 
 defmatch (laplog1,  %sratio*log(%s) ) ;
 
+defmatch (lapatan, %fun*atan(%sratio) ); 
 /*
 hypergeometric patterns
 */
@@ -277,16 +279,18 @@ ilaplace(expr):=block([l, r:1, l2:1, r2:1, %matchparams:[], fun, sfun, ret:false
 				[fun, %lvar, %tvar]:ilapargs(expr)				
 			) else (
 				[l, r]:oppart(expr, ilaplacexp),
-				display(l, r),
+				/* display(l, r),*/
 				[fun, %lvar, %tvar]:ilapargs(l)
 			),
 			/* shift  pattern injected here */
 			[zz, sfun]: ilapshiftarg(fun, %lvar, %tvar),				
 			/*display(sfun, zz, fun),*/
-			[l2, r2]:subst(nil=1, partbyvar( fun, %lvar)), 	
-			/*disp(l2, r2),*/
-			ret: r*l2* intablelapfun(r2, %lvar)
-		
+			if not numberp(sfun) and zz#1 then (
+				[l2, r2]:subst(nil=1, partbyvar( sfun, %lvar)), 	
+				/*display(l2, r2), */
+				ret: r*l2* intablelapfun(r2, %lvar)
+			) else 
+				ret: r*intablelapfun(fun, %lvar)
 		)
 	)
 	else ret:false,
@@ -301,6 +305,7 @@ ilaplace(expr):=block([l, r:1, l2:1, r2:1, %matchparams:[], fun, sfun, ret:false
 */
 intablelapfun(expr, lvar):= block(
 	[ops: inop(expr), ret:false, u, v, %matchparams, %p, %s, %q, %fun, %g, %gg ],
+	display(expr),
 	if symbolp(ops) then 
 		ret:laptable[ops](expr)  
 	elseif  predmatch( expr, lapratiosqrt10) then (
@@ -366,6 +371,10 @@ intablelapfun(expr, lvar):= block(
 		disp("hypergeometric ", arrayinfo(%matchparams), listarray (%matchparams) ),
 		ret:laptable["hgf"](%matchparams['%sratiop],  %matchparams['%sratio], %matchparams['%lsta], %matchparams['%lstb])
 	)
+	elseif  predmatch( expr, lapatan)  then (
+		disp("atan ", arrayinfo(%matchparams), listarray (%matchparams) ),
+		ret:%matchparams['%fun] *laptable[atan](  %matchparams['%sratio])
+	)
 	elseif  predmatch( expr, lapratiop) then (
 		disp("fractional power ", arrayinfo(%matchparams), listarray (%matchparams) ),
 		ret:laptable["fp"](%matchparams['%fun],   %matchparams['%g])
@@ -373,6 +382,9 @@ intablelapfun(expr, lvar):= block(
 	else	ret:false,
 	ret
 );
+
+
+
 
 /* fractional power*/
 laptable["fp"]: lambda([u, v],  
@@ -504,18 +516,14 @@ Lookup tables
 /*
  arctan
 */
-laptable[arctan]: lambda([u],  
-	block([ l, r, aa],
-		aa:first(args(u)),		
-		if hipow(aa, %lvar)#-1 then false else (
-		[l, r]: partbyvar(aa, %lvar),
-		1/%tvar *sin (l*%tvar)
-		)
+
+laptable[atan]: lambda([ v],  
+	block([  %p, %g, %s], 
+	if op(v)=atan then v:first(args(v)),
+		lapratio(v),
+		sin(%g*%tvar)/%tvar
 	)
 );
-
-
-
 
 /*	 
 laptable["bef21"]: lambda([u, v], 
