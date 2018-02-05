@@ -1,7 +1,7 @@
 
 load(extlaplace);
 
-a1:ilt(arctan(k/s),s,t);
+a1:ilt(ito,s,t);
 
 ilaplace(q*a1);
 
