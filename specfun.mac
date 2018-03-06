@@ -125,7 +125,7 @@ wrightsimp(wexpr):=block([ l, r, sargs, ret ],
 			else 
 				ret:bessel_j(sargs[2]-1, 2 *sqrt(-sargs[3])) / (-sargs[3])^( (sargs[2]-1)/2),
 		if sargs[1]=-1/2 and sargs[2]=1 then
-			ret:erfc(-sargs[3]/2),
+			ret:erfc(-sargs[3]/2)/2,
 		if sargs[1]=-1/2 and sargs[2]=1/2 then
 			ret:exp(-sargs[3]^2/4)/sqrt(%pi),
 	/*	if sargs[1]=-1/2 and sargs[2]=3/2 then

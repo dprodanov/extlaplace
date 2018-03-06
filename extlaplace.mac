@@ -286,7 +286,7 @@ ilaplace(expr):=block([l, r:1, l2:1, r2:1, %matchparams:[], fun, sfun, ret:false
 			[zz, sfun]: ilapshiftarg(fun, %lvar, %tvar),				
 			/*display(sfun, zz, fun),*/
 			if not numberp(sfun) and zz#1 then (
-				[l2, r2]:subst(nil=1, partbyvar( sfun, %lvar)), 	
+				[l2, r2]:subst(nil=1, oppart(sfun,  lambda([u], freeof(%lvar, u) and inop(sfun)#"^" ))), 	
 				/*display(l2, r2), */
 				ret: r*l2* intablelapfun(r2, %lvar)
 			) else 
@@ -304,7 +304,7 @@ ilaplace(expr):=block([l, r:1, l2:1, r2:1, %matchparams:[], fun, sfun, ret:false
  main table  lookup functionality
 */
 intablelapfun(expr, lvar):= block(
-	[ops: inop(expr), ret:false, u, v, %matchparams, %p, %s, %q, %fun, %g, %gg ],
+	[ops: inop(expr), ret:false, u, v, %matchparams, %p, %s, %q, %fun, %g, %gg, fk:1 ],
 	display(expr),
 	if symbolp(ops) then 
 		ret:laptable[ops](expr)  
@@ -338,14 +338,15 @@ intablelapfun(expr, lvar):= block(
 	elseif  predmatch( expr, lapexprat3) then (
 		disp("Erfc/ Wright /fractional", arrayinfo(%matchparams), listarray (%matchparams) ),
 		predmatch( %matchparams['%sratiop], lapratiop), 
-		ret:laptable["erf1"](%matchparams['%sfr1], %matchparams['%sratiop], lvar)
+		fk:%matchparams['%fun], 
+		ret:fk*laptable["erf1"](%matchparams['%sfr1], %matchparams['%sratiop], lvar)
 	)
 	elseif  predmatch( expr,   lambda([u],  'lapexprat33(u, lvar))) then (
 		disp("Erfc/ Wright ", arrayinfo(%matchparams), listarray (%matchparams) ),
 		ret:laptable["exp2"](%matchparams['%sfr2], %matchparams['%gg], lvar)
 	)
 	elseif  predmatch( expr, lambda([u],  'lapexprat34(u, lvar))) then (
-		disp("Erfc/ Wright /fractional", arrayinfo(%matchparams), listarray (%matchparams) ),
+		disp("Erfc/ Wright /fractional 2", arrayinfo(%matchparams), listarray (%matchparams) ),
 		predmatch( %matchparams['%sratiop], lapratiop), 
 		ret:laptable["erf2"](%matchparams['%sfr2], %matchparams['%sratiop], %matchparams['%gg], lvar)
 	)
@@ -470,7 +471,7 @@ laptable["exp2"]: lambda([u, k, ss],
 
 laptable["erf1"]: lambda([u, v, ss],  
 	block([ %fun, k, %s, %g, p ],
-		if sgn(u)=1 then return(false),
+		/*if sgn(u)=1 then return(false),*/
 		disp(lapfrexp21(u, ss)),
 		k:%g,  q:%q,
 		disp("erf1", lapratiop(v)), p:%g,
@@ -481,6 +482,7 @@ laptable["erf1"]: lambda([u, v, ss],
 			%fun:k*2/sqrt(%pi)*%tvar^(q)*exp(-1/4/%tvar*k^2)  -k*erfc(k/2*%tvar^(-q))
 		else */
 			%fun:1/%tvar^(1-p)*wright(-q, p, k/%tvar^q),
+			disp(%fun),
 		wrightsimp(%fun)		
 	)
 );
